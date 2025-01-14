@@ -849,6 +849,19 @@ class sscsrind_reg_csr_t : public csr_t {
   csr_t_p get_reg() const noexcept;
 };
 
+class sscsrind_select_csr_t: public basic_csr_t {
+ public:
+  sscsrind_select_csr_t(processor_t* const proc, const reg_t addr, const reg_t init);
+ protected:
+  virtual void verify_permissions(insn_t insn, bool write) const override;
+};
+
+class virtualized_select_indirect_csr_t: public virtualized_csr_t {
+ public:
+  virtualized_select_indirect_csr_t(processor_t* const proc, csr_t_p orig, csr_t_p virt);
+  virtual void verify_permissions(insn_t insn, bool write) const override;
+};
+
 // smcntrpmf_csr_t caches the previous state of the CSR in case a CSRW instruction
 // modifies the state that should not be immediately visible to bump()
 class smcntrpmf_csr_t : public masked_csr_t {
