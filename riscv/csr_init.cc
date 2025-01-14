@@ -349,11 +349,12 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   }
 
   if (proc->extension_enabled_const(EXT_SSCSRIND)) {
-    csr_t_p vsiselect = std::make_shared<basic_csr_t>(proc, CSR_VSISELECT, 0);
+    auto vsiselect = std::make_shared<sscsrind_select_csr_t>(proc, CSR_VSISELECT, 0);
     add_hypervisor_csr(CSR_VSISELECT, vsiselect);
 
-    csr_t_p siselect = std::make_shared<basic_csr_t>(proc, CSR_SISELECT, 0);
-    add_supervisor_csr(CSR_SISELECT, std::make_shared<virtualized_csr_t>(proc, siselect, vsiselect));
+    auto siselect = std::make_shared<sscsrind_select_csr_t>(proc, CSR_SISELECT, 0);
+    // Correct virtualized type?
+    add_supervisor_csr(CSR_SISELECT, std::make_shared<virtualized_select_indirect_csr_t>(proc, siselect, vsiselect));
 
     const reg_t vsireg_csrs[] = { CSR_VSIREG, CSR_VSIREG2, CSR_VSIREG3, CSR_VSIREG4, CSR_VSIREG5, CSR_VSIREG6 };
     const reg_t sireg_csrs[] = { CSR_SIREG, CSR_SIREG2, CSR_SIREG3, CSR_SIREG4, CSR_SIREG5, CSR_SIREG6 };
