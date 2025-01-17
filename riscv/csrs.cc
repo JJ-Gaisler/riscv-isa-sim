@@ -1774,34 +1774,47 @@ void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
   bool is_vsi   = csr_priv == PRV_HS;
   if (csr_priv < PRV_M){
     // The CSRIND bit in mstateen0 controls access to the siselect, sireg*, vsiselect, and the vsireg*
+    // Stateen takes precedence over general sscsrind rules
     if (proc->extension_enabled(EXT_SMSTATEEN)) {
-      if ((state->prv < PRV_M) &&
-          !(state->mstateen[0]->read() & MSTATEEN0_CSRIND))
+      bool m_csrind = state->mstateen[0]->read() & MSTATEEN0_CSRIND;
+      bool h_csrind = state->hstateen[0]->read() & HSTATEEN0_CSRIND;
+      if (!m_csrind){
+        std::cerr << "mstateen missing\n";
         throw trap_illegal_instruction(insn.bits());
-
-      if (state->v && !(state->hstateen[0]->read() & HSTATEEN0_CSRIND))
-        throw trap_virtual_instruction(insn.bits());
+      }
+      if (state->v && !h_csrind){
+          std::cerr << "hstateen missing\n";
+          throw trap_virtual_instruction(insn.bits());
+      }
     }
   }
+  // NOTE: This is implicit since prior checks didn't throw.
+  // if mstateen0[60] = 1, a virtual instruction exception is raised as described in the previous section...
+  // sscsrind says...
   // A virtual instruction exception is raised for attempts from VS-mode or VU-mode to directly access
   // vsiselect or vsireg*, or attempts from VU-mode to access siselect or sireg*.
   if (state->v and csr_priv < PRV_M){
     if (is_vsi){
+      std::cerr << "access to vsireg in VS/VU\n";
       throw trap_virtual_instruction(insn.bits());
-    } else if (state->prv == PRV_U)
+    } else if (state->prv == PRV_U){
+      std::cerr << "access to sireg in VU\n";
       throw trap_virtual_instruction(insn.bits());
+    }
   }
 
   csr_t_p proxy_csr = get_reg();
+  std::cerr << "Looking for proxy_csr (" << proxy_csr << ") select = " << iselect << std::endl;
   if (proxy_csr == nullptr) {
     // The spec recomends raising illegal if the proxy csr is not implemented.
     throw trap_illegal_instruction(insn.bits());
   }
+  proxy_csr->verify_permissions(insn, write);
+
   // Don't call base verify_permission for VS registers remapped to S-mode
   if (insn.csr() == address)
     csr_t::verify_permissions(insn, write);
 
-  proxy_csr->verify_permissions(insn, write);
 }
 
 
