@@ -1,5 +1,8 @@
-#include "processor.h"
 #include "debug_defines.h"
+#include "processor.h"
+// clang-format off
+// Until it is defined in riscv opcodes
+constexpr reg_t MENVCFG_CDE = 1ul << 60;
 
 void state_t::add_csr(reg_t addr, const csr_t_p& csr)
 {
@@ -35,11 +38,11 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
 
   const reg_t minstretcfg_mask = !proc->extension_enabled_const(EXT_SMCNTRPMF) ? 0 :
     MHPMEVENT_MINH | MHPMEVENT_SINH | MHPMEVENT_UINH | MHPMEVENT_VSINH | MHPMEVENT_VUINH;
-  auto minstretcfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MINSTRETCFG, minstretcfg_mask, 0);
-  auto mcyclecfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MCYCLECFG, minstretcfg_mask, 0);
+  auto _minstretcfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MINSTRETCFG, minstretcfg_mask, 0);
+  auto _mcyclecfg = std::make_shared<smcntrpmf_csr_t>(proc, CSR_MCYCLECFG, minstretcfg_mask, 0);
 
-  minstret = std::make_shared<wide_counter_csr_t>(proc, CSR_MINSTRET, minstretcfg);
-  mcycle = std::make_shared<wide_counter_csr_t>(proc, CSR_MCYCLE, mcyclecfg);
+  minstret = std::make_shared<wide_counter_csr_t>(proc, CSR_MINSTRET, _minstretcfg);
+  mcycle = std::make_shared<wide_counter_csr_t>(proc, CSR_MCYCLE, _mcyclecfg);
   time = std::make_shared<time_counter_csr_t>(proc, CSR_TIME);
   if (proc->extension_enabled_const(EXT_ZICNTR)) {
     add_csr(CSR_INSTRET, std::make_shared<counter_proxy_csr_t>(proc, CSR_INSTRET, minstret));
@@ -250,7 +253,8 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
                             (proc->extension_enabled(EXT_SSTC) ? MENVCFG_STCE : 0) |
                             (proc->extension_enabled(EXT_ZICFILP) ? MENVCFG_LPE : 0) |
                             (proc->extension_enabled(EXT_ZICFISS) ? MENVCFG_SSE : 0) |
-                            (proc->extension_enabled(EXT_SSDBLTRP) ? MENVCFG_DTE : 0);
+                            (proc->extension_enabled(EXT_SSDBLTRP) ? MENVCFG_DTE : 0) |
+                            (proc->extension_enabled(EXT_SMCDELEG) ? MENVCFG_CDE : 0);
   menvcfg = std::make_shared<envcfg_csr_t>(proc, CSR_MENVCFG, menvcfg_mask, 0);
   if (xlen == 32) {
     add_user_csr(CSR_MENVCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MENVCFG, menvcfg));
@@ -370,13 +374,13 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
 
   if (proc->extension_enabled_const(EXT_SMCNTRPMF)) {
     if (xlen == 32) {
-      add_csr(CSR_MCYCLECFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MCYCLECFG, mcyclecfg));
-      add_csr(CSR_MCYCLECFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MCYCLECFGH, mcyclecfg));
-      add_csr(CSR_MINSTRETCFG, std::make_shared<rv32_low_csr_t>(proc, CSR_MINSTRETCFG, minstretcfg));
-      add_csr(CSR_MINSTRETCFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MINSTRETCFGH, minstretcfg));
+      add_csr(CSR_MCYCLECFG, mcyclecfg = std::make_shared<rv32_low_csr_t>(proc, CSR_MCYCLECFG, _mcyclecfg));
+      add_csr(CSR_MCYCLECFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MCYCLECFGH, _mcyclecfg));
+      add_csr(CSR_MINSTRETCFG, minstretcfg = std::make_shared<rv32_low_csr_t>(proc, CSR_MINSTRETCFG, _minstretcfg));
+      add_csr(CSR_MINSTRETCFGH, std::make_shared<rv32_high_csr_t>(proc, CSR_MINSTRETCFGH, _minstretcfg));
     } else {
-      add_csr(CSR_MCYCLECFG, mcyclecfg);
-      add_csr(CSR_MINSTRETCFG, minstretcfg);
+      add_csr(CSR_MCYCLECFG, mcyclecfg = _mcyclecfg);
+      add_csr(CSR_MINSTRETCFG, minstretcfg = _minstretcfg);
     }
   }
 
