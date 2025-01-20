@@ -1740,12 +1740,10 @@ void virtualized_indirect_csr_t::verify_permissions(insn_t insn, bool write) con
   if (proc->extension_enabled(EXT_SMSTATEEN)) {
     if ((state->prv < PRV_M) &&
         !(state->mstateen[0]->read() & MSTATEEN0_CSRIND)){
-      std::cerr << "stateen illegal\n";
       throw trap_illegal_instruction(insn.bits());
     }
 
     if (state->v && !(state->hstateen[0]->read() & HSTATEEN0_CSRIND)){
-      std::cerr << "stateen virtual\n";
       throw trap_virtual_instruction(insn.bits());
     }
   }
@@ -1808,7 +1806,7 @@ void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
 
   csr_t_p proxy_csr = get_reg();
   if (proxy_csr == nullptr) {
-    std::cerr << "Missing proxy CSR\n";
+    // The spec recommends raising illegal if a proxy CSR isn't implemented.
     throw trap_illegal_instruction(insn.bits());
   }
   proxy_csr->verify_permissions(insn, write);
