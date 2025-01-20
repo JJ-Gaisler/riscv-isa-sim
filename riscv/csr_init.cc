@@ -420,25 +420,25 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
     // The spec states that an access to any sireg* in VS mode should raise virtual if menvcfg.cde = 1.
     // This seems quite backward to me, but perhaps I am missing something.
     add_proxy(sireg, SISELECT_SMCDELEG_START, CSR_MCYCLE);
-    add_proxy(sireg, 0x41, 0xDEADBEEF);
+    add_proxy(sireg, SISELECT_SMCDELEG_UNUSED, 0xDEADBEEF);
     add_proxy(sireg, SISELECT_SMCDELEG_INSTRET, CSR_MINSTRET);
 
     add_proxy(sireg2, SISELECT_SMCDELEG_START, CSR_MCYCLECFG);
-    add_proxy(sireg2, 0x41, 0xDEADBEEF);
+    add_proxy(sireg2, SISELECT_SMCDELEG_UNUSED, 0xDEADBEEF);
     add_proxy(sireg2, SISELECT_SMCDELEG_INSTRETCFG, CSR_MINSTRETCFG);
 
     add_proxy(sireg4, SISELECT_SMCDELEG_START, CSR_MCYCLEH);
-    add_proxy(sireg4, 0x41, 0xDEADBEEF);
+    add_proxy(sireg4, SISELECT_SMCDELEG_UNUSED, 0xDEADBEEF);
     add_proxy(sireg4, SISELECT_SMCDELEG_INSTRET, CSR_MINSTRETH);
 
     add_proxy(sireg5, SISELECT_SMCDELEG_START, CSR_MCYCLECFGH);
-    add_proxy(sireg5, 0x41, 0xDEADBEEF);
+    add_proxy(sireg5, SISELECT_SMCDELEG_UNUSED, 0xDEADBEEF);
     add_proxy(sireg5, SISELECT_SMCDELEG_INSTRETCFG, CSR_MINSTRETCFGH);
 
     // Dummies...
     for (auto i = 0; i < 32; i++){
-      add_proxy(sireg3, 0x40+i, 0xDEADBEEF);
-      add_proxy(sireg6, 0x40+i, 0xDEADBEEF);
+      add_proxy(sireg3, SISELECT_SMCDELEG_START+i, 0xDEADBEEF);
+      add_proxy(sireg6, SISELECT_SMCDELEG_START+i, 0xDEADBEEF);
     }
     for (auto cnt = 0; cnt < 29; cnt++) {
       add_proxy(sireg, SISELECT_SMCDELEG_HPMCOUNTER_3 + cnt, CSR_HPMCOUNTER3 + cnt);
