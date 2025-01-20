@@ -1,4 +1,5 @@
 // See LICENSE for license details.
+// clang-format off
 
 // For std::any_of
 #include <algorithm>
@@ -1786,60 +1787,29 @@ void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
     // The CSRIND bit in mstateen0 controls access to the siselect, sireg*, vsiselect, and the vsireg*
     // Stateen takes precedence over general sscsrind rules
     if (proc->extension_enabled(EXT_SMSTATEEN)) {
-      bool m_csrind = state->mstateen[0]->read() & MSTATEEN0_CSRIND;
-      bool h_csrind = state->hstateen[0]->read() & HSTATEEN0_CSRIND;
-      if (!m_csrind){
-        std::cerr << "mstateen missing\n";
+      const bool m_csrind = state->mstateen[0]->read() & MSTATEEN0_CSRIND;
+      const bool h_csrind = state->hstateen[0]->read() & HSTATEEN0_CSRIND;
+      if (!m_csrind)
         throw trap_illegal_instruction(insn.bits());
-      }
-      if (state->v && !h_csrind){
-          std::cerr << "hstateen missing\n";
+
+      if (state->v && !h_csrind)
           throw trap_virtual_instruction(insn.bits());
-      }
     }
   }
-  // NOTE: This is implicit since prior checks didn't throw.
-  // if mstateen0[60] = 1, a virtual instruction exception is raised as described in the previous section...
-  // sscsrind says...
+
   // A virtual instruction exception is raised for attempts from VS-mode or VU-mode to directly access
   // vsiselect or vsireg*, or attempts from VU-mode to access siselect or sireg*.
   if (state->v and csr_priv < PRV_M){
-    if (is_vsi){
-      std::cerr << "access to vsireg in VS/VU\n";
+    if (is_vsi)
       throw trap_virtual_instruction(insn.bits());
-    } else if (state->prv == PRV_U){
-      std::cerr << "access to sireg in VU\n";
+    else if (state->prv == PRV_U)
       throw trap_virtual_instruction(insn.bits());
-    }
   }
 
   csr_t_p proxy_csr = get_reg();
-  std::cerr << "Looking for proxy_csr (" << proxy_csr << ") select = " << iselect->read() << std::endl;
   if (proxy_csr == nullptr) {
-    // Couldn't find a better place to put this check, since VS mode is expected to throw virtual
-    // even if an underlying extension is not implemented. This means that if for example zihpm is missing
-    // the proxy CSR won't be found. The spec still says that:
-    // An attempt from VS-mode to access sireg* should throw virtual if menvcfg.cde = 1
-#if 0
-    if (state->v && state->prv == PRV_S){
-      if ((iselect->read() >= SISELECT_SMCDELEG_START && iselect->read() <= SISELECT_SMCDELEG_END)
-        && proc->extension_enabled_const(EXT_SMCDELEG)){
-        if (state->menvcfg->read() & MENVCFG_CDE){
-          throw trap_virtual_instruction(insn.bits());
-        } else {
-          throw trap_illegal_instruction(insn.bits());
-        }
-      }
-    } else {
-      // The spec recomends raising illegal if the proxy csr is not implemented.
-      std::cerr << "Missing proxy CSR\n";
-      throw trap_illegal_instruction(insn.bits());
-    }
-#else
-      std::cerr << "Missing proxy CSR\n";
-      throw trap_illegal_instruction(insn.bits());
-#endif
-
+    std::cerr << "Missing proxy CSR\n";
+    throw trap_illegal_instruction(insn.bits());
   }
   proxy_csr->verify_permissions(insn, write);
 
@@ -1872,18 +1842,21 @@ sscsrind_select_csr_t::sscsrind_select_csr_t(processor_t *const proc, const reg_
     : basic_csr_t(proc, addr, init) {}
 
 void sscsrind_select_csr_t::verify_permissions(insn_t insn, bool write) const {
-  auto csr_priv = get_field(this->address, 0x300);
-  bool is_vsi   = csr_priv == PRV_HS;
+  const auto csr_priv = get_field(this->address, 0x300);
+  const bool is_vsi   = csr_priv == PRV_HS;
   // The CSRIND bit in mstateen0 controls access to the siselect, sireg*, vsiselect, and the vsireg*
   if (proc->extension_enabled(EXT_SMSTATEEN)) {
-    if ((state->prv < PRV_M) &&
-        !(state->mstateen[0]->read() & MSTATEEN0_CSRIND))
+    const bool m_csrind = state->mstateen[0]->read() & MSTATEEN0_CSRIND;
+    const bool h_csrind = state->hstateen[0]->read() & HSTATEEN0_CSRIND;
+    if (!m_csrind)
       throw trap_illegal_instruction(insn.bits());
 
-    if (state->v && !(state->hstateen[0]->read() & HSTATEEN0_CSRIND))
-      throw trap_virtual_instruction(insn.bits());
+    if (state->v && !h_csrind)
+        throw trap_virtual_instruction(insn.bits());
   }
-  if (state->v and csr_priv < PRV_M){
+  // A virtual instruction exception is raised for attempts from VS-mode or VU-mode to directly access
+  // vsiselect or vsireg*, or attempts from VU-mode to access siselect or sireg*.
+  if (state->v){
     if (is_vsi){
       throw trap_virtual_instruction(insn.bits());
     } else if (state->prv == PRV_U)
