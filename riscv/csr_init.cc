@@ -388,30 +388,65 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   add_const_ext_csr(EXT_SSQOSID, CSR_SRMCFG, std::make_shared<srmcfg_csr_t>(proc, CSR_SRMCFG, srmcfg_mask, 0));
 
   if (proc->extension_enabled_const(EXT_SMCDELEG) && proc->extension_enabled_const(EXT_SSCSRIND)) {
+    add_supervisor_csr(CSR_SCOUNTINHIBIT, std::make_shared<scountinhibit_csr_t>(proc, CSR_SCOUNTINHIBIT));
     auto sireg     = std::dynamic_pointer_cast<virtualized_indirect_csr_t>(csrmap.at(CSR_SIREG));
     auto sireg2    = std::dynamic_pointer_cast<virtualized_indirect_csr_t>(csrmap.at(CSR_SIREG2));
+    auto sireg3    = std::dynamic_pointer_cast<virtualized_indirect_csr_t>(csrmap.at(CSR_SIREG3));
     auto sireg4    = std::dynamic_pointer_cast<virtualized_indirect_csr_t>(csrmap.at(CSR_SIREG4));
     auto sireg5    = std::dynamic_pointer_cast<virtualized_indirect_csr_t>(csrmap.at(CSR_SIREG5));
+    auto sireg6    = std::dynamic_pointer_cast<virtualized_indirect_csr_t>(csrmap.at(CSR_SIREG6));
     auto add_proxy = [&proc, this](std::shared_ptr<virtualized_indirect_csr_t> ireg,
                                    reg_t                                       select,
                                    reg_t                                       csr_proxy) {
       assert(ireg);
-      assert(csrmap.find(csr_proxy) != csrmap.end());
+      const auto exists = csrmap.find(csr_proxy) != csrmap.end();
+      const auto dummy = std::make_shared<basic_csr_t>(proc, 0xdeafbeef, 0);
 
-      auto smc_obj_orig =
-        std::make_shared<smcdeleg_indir_csr_t>(proc, ireg->address, select, csrmap.at(csr_proxy));
+      auto smc_obj_orig = std::make_shared<smcdeleg_indir_csr_t>(
+          proc, ireg->address, select, exists ? csrmap.at(csr_proxy) : dummy , !exists);
       auto orig_csr = std::dynamic_pointer_cast<sscsrind_reg_csr_t>(ireg->get_orig_csr());
       assert(orig_csr);
       orig_csr->add_ireg_proxy(select, smc_obj_orig);
 
-      // We need to add vsireg everywhere to be able to throw virtual on them, otherwise when csrind
-      // looks for the select value it won't find any csr and thus throw illegal.
       auto smc_obj_virt = std::make_shared<smcdeleg_indir_csr_t>(
-        proc, ireg->address + 0x100, select, csrmap.at(csr_proxy));
+        proc, ireg->address + 0x100, select, exists ? csrmap.at(csr_proxy) : dummy, !exists);
       auto virt_csr = std::dynamic_pointer_cast<sscsrind_reg_csr_t>(ireg->get_virt_csr());
       assert(virt_csr);
       virt_csr->add_ireg_proxy(select, smc_obj_virt);
     };
+    #if 1
+    // We need to add all CSRs to be able to throw virtual on them, otherwise when csrind
+    // looks for the select value it won't find any csr and thus throw illegal.
+    // The spec states that an access to any sireg* in VS mode should raise virtual if menvcfg.cde = 1.
+    // This seems quite backward to me, but perhaps I am missing something.
+    add_proxy(sireg, SISELECT_SMCDELEG_START, CSR_MCYCLE);
+    add_proxy(sireg, 0x41, 0xDEADBEEF);
+    add_proxy(sireg, SISELECT_SMCDELEG_INSTRET, CSR_MINSTRET);
+
+    add_proxy(sireg2, SISELECT_SMCDELEG_START, CSR_MCYCLECFG);
+    add_proxy(sireg2, 0x41, 0xDEADBEEF);
+    add_proxy(sireg2, SISELECT_SMCDELEG_INSTRETCFG, CSR_MINSTRETCFG);
+
+    add_proxy(sireg4, SISELECT_SMCDELEG_START, CSR_MCYCLEH);
+    add_proxy(sireg4, 0x41, 0xDEADBEEF);
+    add_proxy(sireg4, SISELECT_SMCDELEG_INSTRET, CSR_MINSTRETH);
+
+    add_proxy(sireg5, SISELECT_SMCDELEG_START, CSR_MCYCLECFGH);
+    add_proxy(sireg5, 0x41, 0xDEADBEEF);
+    add_proxy(sireg5, SISELECT_SMCDELEG_INSTRETCFG, CSR_MINSTRETCFGH);
+
+    // Dummies...
+    for (auto i = 0; i < 32; i++){
+      add_proxy(sireg3, 0x40+i, 0xDEADBEEF);
+      add_proxy(sireg6, 0x40+i, 0xDEADBEEF);
+    }
+    for (auto cnt = 0; cnt < 29; cnt++) {
+      add_proxy(sireg, SISELECT_SMCDELEG_HPMCOUNTER_3 + cnt, CSR_HPMCOUNTER3 + cnt);
+      add_proxy(sireg2, SISELECT_SMCDELEG_HPMEVENT_3 + cnt, CSR_MHPMEVENT3 + cnt);
+      add_proxy(sireg4, SISELECT_SMCDELEG_HPMCOUNTER_3 + cnt, CSR_HPMCOUNTER3H + cnt);
+      add_proxy(sireg5, SISELECT_SMCDELEG_HPMEVENT_3 + cnt, CSR_MHPMEVENT3H + cnt);
+    }
+    #else
 
     if (proc->extension_enabled_const(EXT_ZICNTR)) {
       add_proxy(sireg, SISELECT_SMCDELEG_START, CSR_MCYCLE);
@@ -443,5 +478,6 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
         }
       }
     }
+    #endif
   }
 }

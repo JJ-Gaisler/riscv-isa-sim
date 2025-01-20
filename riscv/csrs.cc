@@ -20,6 +20,7 @@
 #undef STATE
 #define STATE (*state)
 
+constexpr reg_t MENVCFG_CDE = 1ul << 60;
 // implement class csr_t
 csr_t::csr_t(processor_t* const proc, const reg_t addr):
   proc(proc),
@@ -1808,14 +1809,14 @@ void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
     }
   }
 
-  constexpr reg_t MENVCFG_CDE = 1ul << 60;
   csr_t_p proxy_csr = get_reg();
-  std::cerr << "Looking for proxy_csr (" << proxy_csr << ") select = " << iselect << std::endl;
+  std::cerr << "Looking for proxy_csr (" << proxy_csr << ") select = " << iselect->read() << std::endl;
   if (proxy_csr == nullptr) {
     // Couldn't find a better place to put this check, since VS mode is expected to throw virtual
     // even if an underlying extension is not implemented. This means that if for example zihpm is missing
     // the proxy CSR won't be found. The spec still says that:
     // An attempt from VS-mode to access sireg* should throw virtual if menvcfg.cde = 1
+#if 0
     if (state->v && state->prv == PRV_S){
       if ((iselect->read() >= SISELECT_SMCDELEG_START && iselect->read() <= SISELECT_SMCDELEG_END)
         && proc->extension_enabled_const(EXT_SMCDELEG)){
@@ -1830,6 +1831,10 @@ void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
       std::cerr << "Missing proxy CSR\n";
       throw trap_illegal_instruction(insn.bits());
     }
+#else
+      std::cerr << "Missing proxy CSR\n";
+      throw trap_illegal_instruction(insn.bits());
+#endif
 
   }
   proxy_csr->verify_permissions(insn, write);
@@ -1987,8 +1992,8 @@ bool hstatus_csr_t::unlogged_write(const reg_t val) noexcept {
   return basic_csr_t::unlogged_write(new_hstatus);
 }
 
-smcdeleg_indir_csr_t::smcdeleg_indir_csr_t(processor_t* const proc, const reg_t addr, const reg_t select, const csr_t_p csr) :
-  csr_t(proc,addr), addr(addr), select(select), orig_csr(csr){
+smcdeleg_indir_csr_t::smcdeleg_indir_csr_t(processor_t* const proc, const reg_t addr, const reg_t select, const csr_t_p csr, bool missing) :
+  csr_t(proc,addr), addr(addr), select(select), orig_csr(csr), missing(missing){
   assert (select >= SISELECT_SMCDELEG_START and select <= SISELECT_SMCDELEG_END);
 }
 
@@ -2022,16 +2027,17 @@ reg_t smcdeleg_indir_csr_t::read() const noexcept {
 }
 void
 smcdeleg_indir_csr_t::verify_permissions(insn_t insn, bool write) const{
-  constexpr reg_t MENVCFG_CDE = 1ul << 60;
   bool is_vsi = get_field(addr, 0x300) == PRV_HS;
   std::cerr << "insn = 0x" << std::hex << insn.bits() << " addr = 0x" << addr << std::endl;
   auto counter_offset = select - SISELECT_SMCDELEG_START;
   auto counter_enabled = (state->mcounteren->read() >> counter_offset) & 1;
   assert(counter_offset >= 0);
+  const bool cde = state->menvcfg->read() & MENVCFG_CDE;
+
 
   // Counter must be active and mencfg.cde must be set (when access comes from M or HS)
-  if ((state->prv >= PRV_S && !state->v) && (!(state->menvcfg->read() & MENVCFG_CDE) || !counter_enabled)){
-    std::cerr << "menvcfg = 0x" << std::hex << state->menvcfg->read() << " counter_enabled = " << counter_enabled << std::endl;
+  if ((state->prv >= PRV_S && !state->v) && (missing || !cde || !counter_enabled)){
+    std::cerr << "menvcfg = 0x" << std::hex << state->menvcfg->read() << " counter_enabled = " << counter_enabled << " missing: " << missing << std::endl;
     throw trap_illegal_instruction(insn.bits());
   }
 
@@ -2042,13 +2048,25 @@ smcdeleg_indir_csr_t::verify_permissions(insn_t insn, bool write) const{
     }
     else if (state->prv == PRV_S and state->v){
       std::cerr << "Attempts to access vsireg in VS mode raises illegal/virtual (envcfg)\n";
-      if (state->menvcfg->read() & MENVCFG_CDE){
+      if (cde){
         throw trap_virtual_instruction(insn.bits());
       } else {
         throw trap_illegal_instruction(insn.bits());
       }
     } else {
       std::cerr << "Can this happen??? prv = " << state->prv << " v = " << state->v << " menvcfg = 0x" << std::hex << state->menvcfg->read() << std::endl;
+    }
+  } else { // Sireg*
+  // An attempt from VS-mode to access any sireg* (really vsireg*) raises an illegal instruction
+  // exception if menvcfg.CDE = 0, or a virtual instruction exception if menvcfg.CDE = 1
+  // NOTE: As far as I have understood this should be the case no matter if the underlying CSR doesn't exist?
+  // Eg) if VS tries to access mcycleh (sireg4, siselect = 0x40) this would be virtual?
+    if (state->v && state->prv == PRV_S){
+      assert(missing);
+      if (cde)
+        throw trap_virtual_instruction(insn.bits());
+      else
+        throw trap_illegal_instruction(insn.bits());
     }
   }
 

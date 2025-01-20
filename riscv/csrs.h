@@ -918,7 +918,7 @@ class hstatus_csr_t final: public basic_csr_t {
 
 class smcdeleg_indir_csr_t : public csr_t {
  public:
-  smcdeleg_indir_csr_t(processor_t* const proc, const reg_t addr, const reg_t select, const csr_t_p csr);
+  smcdeleg_indir_csr_t(processor_t* const proc, const reg_t addr, const reg_t select, const csr_t_p csr, bool missing);
  protected:
   virtual bool unlogged_write(const reg_t val) noexcept;
   virtual void verify_permissions(insn_t insn, bool write) const;
@@ -927,7 +927,7 @@ protected:
   reg_t addr;
   reg_t select;
   csr_t_p orig_csr;
-  static constexpr reg_t MENVCFG_CDE = 1ul << 60;
+  bool missing;
 };
 
 class scountinhibit_csr_t: public csr_t {
