@@ -1842,7 +1842,7 @@ sscsrind_select_csr_t::sscsrind_select_csr_t(processor_t *const proc, const reg_
     : basic_csr_t(proc, addr, init) {}
 
 void sscsrind_select_csr_t::verify_permissions(insn_t insn, bool write) const {
-  const auto csr_priv = get_field(this->address, 0x300);
+  const auto csr_priv = get_field(insn.csr(), 0x300);
   const bool is_vsi   = csr_priv == PRV_HS;
   // The CSRIND bit in mstateen0 controls access to the siselect, sireg*, vsiselect, and the vsireg*
   if (proc->extension_enabled(EXT_SMSTATEEN) && state->prv < PRV_M) {
