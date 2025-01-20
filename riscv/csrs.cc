@@ -1780,7 +1780,7 @@ sscsrind_reg_csr_t::sscsrind_reg_csr_t(processor_t* const proc, const reg_t addr
 }
 
 void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
-  auto csr_priv = get_field(this->address, 0x300);
+  auto csr_priv = get_field(insn.csr(), 0x300);
   bool is_vsi   = csr_priv == PRV_HS;
   // csr_priv checked due to mireg using the same class
   if (csr_priv < PRV_M && state->prv < PRV_M){
