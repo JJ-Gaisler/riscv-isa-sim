@@ -1675,6 +1675,10 @@ scountovf_csr_t::scountovf_csr_t(processor_t* const proc, const reg_t addr):
 void scountovf_csr_t::verify_permissions(insn_t insn, bool write) const {
   if (!proc->extension_enabled(EXT_SSCOFPMF))
     throw trap_illegal_instruction(insn.bits());
+
+  if (proc->extension_enabled_const(EXT_SMCDELEG) && state->menvcfg->read() & MENVCFG_CDE && state->v)
+    throw trap_virtual_instruction(insn.bits());
+
   csr_t::verify_permissions(insn, write);
 }
 
@@ -2049,3 +2053,27 @@ smcdeleg_indir_csr_t::verify_permissions(insn_t insn, bool write) const{
   }
 
 }
+
+scountinhibit_csr_t::scountinhibit_csr_t(processor_t* const proc, const reg_t addr) : csr_t(proc, addr){}
+void scountinhibit_csr_t::verify_permissions(insn_t insn, bool write) const {
+  // menvcfg.cde can only be set if smcdeleg is present
+  if (!(state->menvcfg->read() & MENVCFG_CDE))
+    throw trap_illegal_instruction(insn.bits());
+
+  csr_t::verify_permissions(insn, write);
+
+  if (state->v)
+    throw trap_virtual_instruction(insn.bits());
+}
+reg_t scountinhibit_csr_t::read() const noexcept {
+  const auto mask = state->mcounteren->read();
+  return state->mcountinhibit->read() & mask;
+}
+
+bool scountinhibit_csr_t::unlogged_write(const reg_t val)  noexcept {
+  const auto masked_val = state->mcounteren->read() & val;
+  state->mcountinhibit->write(val);
+  return false;
+}
+
+

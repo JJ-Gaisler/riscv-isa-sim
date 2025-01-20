@@ -929,4 +929,13 @@ protected:
   csr_t_p orig_csr;
   static constexpr reg_t MENVCFG_CDE = 1ul << 60;
 };
+
+class scountinhibit_csr_t: public csr_t {
+ public:
+  scountinhibit_csr_t(processor_t* const proc, const reg_t addr);
+  virtual void verify_permissions(insn_t insn, bool write) const override;
+  virtual reg_t read() const noexcept override;
+ protected:
+  virtual bool unlogged_write(const reg_t val) noexcept override;
+};
 #endif
