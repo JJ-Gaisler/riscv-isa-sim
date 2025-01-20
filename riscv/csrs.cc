@@ -1780,9 +1780,9 @@ sscsrind_reg_csr_t::sscsrind_reg_csr_t(processor_t* const proc, const reg_t addr
 }
 
 void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
-  const auto csr_priv = get_field(insn.csr(), 0x300);
-  const bool is_vsi   = csr_priv == PRV_HS;
-  std::cerr << "In sscsrind_reg_csr_t::verify_permissions() insn.csr() = 0x" << std::hex << insn.csr() << " priv = " << state->prv << " is_vsi = " << is_vsi << " csr_priv = " << csr_priv << "\n";
+  auto csr_priv = get_field(this->address, 0x300);
+  bool is_vsi   = csr_priv == PRV_HS;
+  // csr_priv checked due to mireg using the same class
   if (csr_priv < PRV_M && state->prv < PRV_M){
     // The CSRIND bit in mstateen0 controls access to the siselect, sireg*, vsiselect, and the vsireg*
     // Stateen takes precedence over general sscsrind rules
@@ -1845,7 +1845,7 @@ void sscsrind_select_csr_t::verify_permissions(insn_t insn, bool write) const {
   const auto csr_priv = get_field(this->address, 0x300);
   const bool is_vsi   = csr_priv == PRV_HS;
   // The CSRIND bit in mstateen0 controls access to the siselect, sireg*, vsiselect, and the vsireg*
-  if (proc->extension_enabled(EXT_SMSTATEEN)) {
+  if (proc->extension_enabled(EXT_SMSTATEEN) && state->prv < PRV_M) {
     const bool m_csrind = state->mstateen[0]->read() & MSTATEEN0_CSRIND;
     const bool h_csrind = state->hstateen[0]->read() & HSTATEEN0_CSRIND;
     if (!m_csrind)
