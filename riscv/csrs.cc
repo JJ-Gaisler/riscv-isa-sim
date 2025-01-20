@@ -1677,10 +1677,10 @@ void scountovf_csr_t::verify_permissions(insn_t insn, bool write) const {
   if (!proc->extension_enabled(EXT_SSCOFPMF))
     throw trap_illegal_instruction(insn.bits());
 
+  csr_t::verify_permissions(insn, write);
+
   if (proc->extension_enabled_const(EXT_SMCDELEG) && state->menvcfg->read() & MENVCFG_CDE && state->v)
     throw trap_virtual_instruction(insn.bits());
-
-  csr_t::verify_permissions(insn, write);
 }
 
 reg_t scountovf_csr_t::read() const noexcept {
@@ -1738,11 +1738,15 @@ virtualized_indirect_csr_t::virtualized_indirect_csr_t(processor_t* const proc, 
 void virtualized_indirect_csr_t::verify_permissions(insn_t insn, bool write) const {
   if (proc->extension_enabled(EXT_SMSTATEEN)) {
     if ((state->prv < PRV_M) &&
-        !(state->mstateen[0]->read() & MSTATEEN0_CSRIND))
+        !(state->mstateen[0]->read() & MSTATEEN0_CSRIND)){
+      std::cerr << "stateen illegal\n";
       throw trap_illegal_instruction(insn.bits());
+    }
 
-    if (state->v && !(state->hstateen[0]->read() & HSTATEEN0_CSRIND))
+    if (state->v && !(state->hstateen[0]->read() & HSTATEEN0_CSRIND)){
+      std::cerr << "stateen virtual\n";
       throw trap_virtual_instruction(insn.bits());
+    }
   }
   if (state->v)
     virt_csr->verify_permissions(insn, write);
@@ -2027,40 +2031,32 @@ reg_t smcdeleg_indir_csr_t::read() const noexcept {
 }
 void
 smcdeleg_indir_csr_t::verify_permissions(insn_t insn, bool write) const{
-  bool is_vsi = get_field(addr, 0x300) == PRV_HS;
-  std::cerr << "insn = 0x" << std::hex << insn.bits() << " addr = 0x" << addr << std::endl;
-  auto counter_offset = select - SISELECT_SMCDELEG_START;
+  bool is_vsi          = get_field(addr, 0x300) == PRV_HS;
+  auto counter_offset  = select - SISELECT_SMCDELEG_START;
   auto counter_enabled = (state->mcounteren->read() >> counter_offset) & 1;
-  assert(counter_offset >= 0);
   const bool cde = state->menvcfg->read() & MENVCFG_CDE;
 
+  assert(counter_offset >= 0);
 
   // Counter must be active and mencfg.cde must be set (when access comes from M or HS)
   if ((state->prv >= PRV_S && !state->v) && (missing || !cde || !counter_enabled)){
-    std::cerr << "menvcfg = 0x" << std::hex << state->menvcfg->read() << " counter_enabled = " << counter_enabled << " missing: " << missing << std::endl;
     throw trap_illegal_instruction(insn.bits());
   }
 
   if (is_vsi){
     if (state->prv >= PRV_S && !state->v){
-      std::cerr << "Attempts to access vsireg in M or S mode raises illegal\n";
       throw trap_illegal_instruction(insn.bits());
     }
     else if (state->prv == PRV_S and state->v){
-      std::cerr << "Attempts to access vsireg in VS mode raises illegal/virtual (envcfg)\n";
       if (cde){
         throw trap_virtual_instruction(insn.bits());
       } else {
         throw trap_illegal_instruction(insn.bits());
       }
-    } else {
-      std::cerr << "Can this happen??? prv = " << state->prv << " v = " << state->v << " menvcfg = 0x" << std::hex << state->menvcfg->read() << std::endl;
     }
   } else { // Sireg*
   // An attempt from VS-mode to access any sireg* (really vsireg*) raises an illegal instruction
   // exception if menvcfg.CDE = 0, or a virtual instruction exception if menvcfg.CDE = 1
-  // NOTE: As far as I have understood this should be the case no matter if the underlying CSR doesn't exist?
-  // Eg) if VS tries to access mcycleh (sireg4, siselect = 0x40) this would be virtual?
     if (state->v && state->prv == PRV_S){
       assert(missing);
       if (cde)
@@ -2069,7 +2065,6 @@ smcdeleg_indir_csr_t::verify_permissions(insn_t insn, bool write) const{
         throw trap_illegal_instruction(insn.bits());
     }
   }
-
 }
 
 scountinhibit_csr_t::scountinhibit_csr_t(processor_t* const proc, const reg_t addr) : csr_t(proc, addr){}
@@ -2083,6 +2078,7 @@ void scountinhibit_csr_t::verify_permissions(insn_t insn, bool write) const {
   if (state->v)
     throw trap_virtual_instruction(insn.bits());
 }
+
 reg_t scountinhibit_csr_t::read() const noexcept {
   const auto mask = state->mcounteren->read();
   return state->mcountinhibit->read() & mask;
@@ -2093,5 +2089,3 @@ bool scountinhibit_csr_t::unlogged_write(const reg_t val)  noexcept {
   state->mcountinhibit->write(val);
   return false;
 }
-
-

@@ -414,11 +414,12 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
       assert(virt_csr);
       virt_csr->add_ireg_proxy(select, smc_obj_virt);
     };
-    #if 1
+
     // We need to add all CSRs to be able to throw virtual on them, otherwise when csrind
     // looks for the select value it won't find any csr and thus throw illegal.
     // The spec states that an access to any sireg* in VS mode should raise virtual if menvcfg.cde = 1.
-    // This seems quite backward to me, but perhaps I am missing something.
+    // Most likely the motivation for this is to not leak information about which extensions the
+    // underlying machine has implemented.
     add_proxy(sireg, SISELECT_SMCDELEG_START, CSR_MCYCLE);
     add_proxy(sireg, SISELECT_SMCDELEG_UNUSED, 0xDEADBEEF);
     add_proxy(sireg, SISELECT_SMCDELEG_INSTRET, CSR_MINSTRET);
@@ -446,38 +447,5 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
       add_proxy(sireg4, SISELECT_SMCDELEG_HPMCOUNTER_3 + cnt, CSR_HPMCOUNTER3H + cnt);
       add_proxy(sireg5, SISELECT_SMCDELEG_HPMEVENT_3 + cnt, CSR_MHPMEVENT3H + cnt);
     }
-    #else
-
-    if (proc->extension_enabled_const(EXT_ZICNTR)) {
-      add_proxy(sireg, SISELECT_SMCDELEG_START, CSR_MCYCLE);
-      add_proxy(sireg, SISELECT_SMCDELEG_START, CSR_MCYCLE);
-      add_proxy(sireg, SISELECT_SMCDELEG_INSTRET, CSR_MINSTRET);
-
-      if (proc->extension_enabled_const(EXT_SMCNTRPMF)) {
-        add_proxy(sireg2, SISELECT_SMCDELEG_START, CSR_MCYCLECFG);
-        add_proxy(sireg2, SISELECT_SMCDELEG_INSTRETCFG, CSR_MINSTRETCFG);
-      }
-
-      if (xlen == 32) {
-        add_proxy(sireg4, SISELECT_SMCDELEG_START, CSR_MCYCLEH);
-        add_proxy(sireg4, SISELECT_SMCDELEG_INSTRET, CSR_MINSTRETH);
-
-        if (proc->extension_enabled_const(EXT_SMCNTRPMF)) {
-          add_proxy(sireg5, SISELECT_SMCDELEG_START, CSR_MCYCLECFGH);
-          add_proxy(sireg5, SISELECT_SMCDELEG_START, CSR_MCYCLECFGH);
-        }
-      }
-    }
-    if (proc->extension_enabled_const(EXT_ZIHPM)) {
-      for (auto cnt = 0; cnt < N_HPMCOUNTERS; cnt++) {
-        add_proxy(sireg, SISELECT_SMCDELEG_HPMCOUNTER_3 + cnt, CSR_HPMCOUNTER3 + cnt);
-        add_proxy(sireg2, SISELECT_SMCDELEG_HPMEVENT_3 + cnt, CSR_MHPMEVENT3 + cnt);
-        if (xlen == 32 && proc->extension_enabled_const(EXT_SSCOFPMF)) {
-          add_proxy(sireg4, SISELECT_SMCDELEG_HPMCOUNTER_3 + cnt, CSR_HPMCOUNTER3H + cnt);
-          add_proxy(sireg5, SISELECT_SMCDELEG_HPMEVENT_3 + cnt, CSR_MHPMEVENT3H + cnt);
-        }
-      }
-    }
-    #endif
   }
 }
