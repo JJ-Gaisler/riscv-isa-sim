@@ -1972,14 +1972,8 @@ smcdeleg_indir_csr_t::smcdeleg_indir_csr_t(processor_t* const proc, const reg_t 
 
 bool smcdeleg_indir_csr_t::unlogged_write(const reg_t val) noexcept {
   reg_t write_val = 0;
-  // MINH masking
   if (addr == CSR_SIREG2 || addr == CSR_SIREG5){
-    if (select == SISELECT_SMCDELEG_START)
-      write_val = (state->mcyclecfg->read() & MHPMEVENT_MINH) | (val & ~MHPMEVENT_MINH);
-    else if (select == SISELECT_SMCDELEG_INSTRETCFG)
-      write_val = (state->minstretcfg->read() & MHPMEVENT_MINH) | (val & ~MHPMEVENT_MINH);
-    else
-      write_val = (state->mevent[select - SISELECT_SMCDELEG_HPMEVENT_3]->read() & MHPMEVENT_MINH) | (val & ~MHPMEVENT_MINH);
+    write_val = (orig_csr->read() & MHPMEVENT_MINH) | (val & ~MHPMEVENT_MINH);
   } else {
     write_val = val;
   }
@@ -1989,12 +1983,7 @@ bool smcdeleg_indir_csr_t::unlogged_write(const reg_t val) noexcept {
 reg_t smcdeleg_indir_csr_t::read() const noexcept {
   // MINH masking
   if (addr == CSR_SIREG2 || addr == CSR_SIREG5){
-    if (select == SISELECT_SMCDELEG_START)
-      return state->mcyclecfg->read() & ~MHPMEVENT_MINH;
-    else if (select == SISELECT_SMCDELEG_INSTRETCFG)
-      return state->minstretcfg->read() & ~MHPMEVENT_MINH;
-    else
-      return state->mevent[select - SISELECT_SMCDELEG_HPMEVENT_3]->read() & ~MHPMEVENT_MINH;
+    return orig_csr->read() & ~MHPMEVENT_MINH;
   }
   return orig_csr->read();
 }
