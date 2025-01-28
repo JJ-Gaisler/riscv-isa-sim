@@ -1737,14 +1737,6 @@ virtualized_indirect_csr_t::virtualized_indirect_csr_t(processor_t* const proc, 
 }
 
 void virtualized_indirect_csr_t::verify_permissions(insn_t insn, bool write) const {
-  if (proc->extension_enabled(EXT_SMSTATEEN)) {
-    if ((state->prv < PRV_M) &&
-        !(state->mstateen[0]->read() & MSTATEEN0_CSRIND))
-      throw trap_illegal_instruction(insn.bits());
-
-    if (state->v && !(state->hstateen[0]->read() & HSTATEEN0_CSRIND))
-      throw trap_virtual_instruction(insn.bits());
-  }
   if (state->v)
     virt_csr->verify_permissions(insn, write);
   else
@@ -1776,8 +1768,8 @@ sscsrind_reg_csr_t::sscsrind_reg_csr_t(processor_t* const proc, const reg_t addr
 }
 
 void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
-  auto csr_priv = get_field(insn.csr(), 0x300);
-  bool is_vsi   = csr_priv == PRV_HS;
+  const auto csr_priv = get_field(insn.csr(), 0x300);
+  const bool is_vsi   = csr_priv == PRV_HS;
   // csr_priv checked due to mireg using the same class
   if (csr_priv < PRV_M && state->prv < PRV_M){
     // The CSRIND bit in mstateen0 controls access to the siselect, sireg*, vsiselect, and the vsireg*
@@ -1789,7 +1781,7 @@ void sscsrind_reg_csr_t::verify_permissions(insn_t insn, bool write) const {
         throw trap_illegal_instruction(insn.bits());
 
       if (state->v && !h_csrind)
-          throw trap_virtual_instruction(insn.bits());
+        throw trap_virtual_instruction(insn.bits());
     }
   }
 
@@ -2046,4 +2038,47 @@ bool scountinhibit_csr_t::unlogged_write(const reg_t val)  noexcept {
   const auto masked_val = state->mcounteren->read() & val;
   state->mcountinhibit->write(val);
   return false;
+}
+
+scontext_csr_t::scontext_csr_t(processor_t* const proc, const reg_t addr, const reg_t mask, const reg_t init) :
+masked_csr_t(proc, addr, mask, init){};
+void scontext_csr_t::verify_permissions(insn_t insn, bool write) const {
+  if (proc->extension_enabled(EXT_SMSTATEEN)) {
+    if ((state->prv < PRV_M) &&
+        !(state->mstateen[0]->read() & MSTATEEN0_HCONTEXT))
+      throw trap_illegal_instruction(insn.bits());
+
+    if (state->v && !(state->hstateen[0]->read() & HSTATEEN0_SCONTEXT))
+      throw trap_virtual_instruction(insn.bits());
+  }
+  masked_csr_t::verify_permissions(insn, write);
+
+}
+
+hcontext_csr_t::hcontext_csr_t(processor_t* const proc, const reg_t addr, const reg_t mask, const reg_t init) :
+masked_csr_t(proc, addr, mask, init){};
+void hcontext_csr_t::verify_permissions(insn_t insn, bool write) const {
+  if (proc->extension_enabled(EXT_SMSTATEEN)) {
+    if ((state->prv < PRV_M) &&
+        !(state->mstateen[0]->read() & MSTATEEN0_HCONTEXT))
+      throw trap_illegal_instruction(insn.bits());
+
+  }
+  masked_csr_t::verify_permissions(insn, write);
+
+}
+
+hedelegh_csr_t::hedelegh_csr_t(processor_t* const proc, const reg_t addr, const reg_t init) :
+const_csr_t(proc, addr, init){};
+void hedelegh_csr_t::verify_permissions(insn_t insn, bool write) const {
+  if (proc->get_const_xlen() != 32)
+    throw trap_illegal_instruction(insn.bits());
+  if (proc->extension_enabled(EXT_SMSTATEEN)) {
+    if ((state->prv < PRV_M) &&
+        !(state->mstateen[0]->read() & MSTATEEN0_PRIV113))
+      throw trap_illegal_instruction(insn.bits());
+
+  }
+  const_csr_t::verify_permissions(insn, write);
+
 }

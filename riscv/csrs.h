@@ -1,6 +1,7 @@
 // See LICENSE for license details.
 #ifndef _RISCV_CSRS_H
 #define _RISCV_CSRS_H
+// clang-format off
 
 #include "common.h"
 #include "encoding.h"
@@ -937,5 +938,25 @@ class scountinhibit_csr_t: public csr_t {
   virtual reg_t read() const noexcept override;
  protected:
   virtual bool unlogged_write(const reg_t val) noexcept override;
+};
+
+class scontext_csr_t: public masked_csr_t {
+ public:
+  scontext_csr_t(processor_t* const proc, const reg_t addr, const reg_t mask, const reg_t init);
+  virtual void verify_permissions(insn_t insn, bool write) const override;
+};
+
+class hcontext_csr_t: public masked_csr_t {
+ public:
+  hcontext_csr_t(processor_t* const proc, const reg_t addr, const reg_t mask, const reg_t init);
+  virtual void verify_permissions(insn_t insn, bool write) const override;
+};
+
+class hedelegh_csr_t: public const_csr_t {
+ public:
+  hedelegh_csr_t(processor_t* const proc, const reg_t addr, const reg_t init);
+  virtual void verify_permissions(insn_t insn, bool write) const override;
+private:
+  static constexpr reg_t MSTATEEN0_PRIV113 = 0x0100000000000000;
 };
 #endif
