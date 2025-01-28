@@ -179,6 +179,8 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
     (1 << CAUSE_SOFTWARE_CHECK_FAULT) |
     (1 << CAUSE_HARDWARE_ERROR_FAULT);
   add_hypervisor_csr(CSR_HEDELEG, hedeleg = std::make_shared<masked_csr_t>(proc, CSR_HEDELEG, hedeleg_mask, 0));
+  constexpr unsigned CSR_HEDELEGH = 0x612;
+  add_hypervisor_csr(CSR_HEDELEGH, std::make_shared<hedelegh_csr_t>(proc, CSR_HEDELEGH, 0));
   add_hypervisor_csr(CSR_HCOUNTEREN, hcounteren = std::make_shared<masked_csr_t>(proc, CSR_HCOUNTEREN, counteren_mask, 0));
   htimedelta = std::make_shared<basic_csr_t>(proc, CSR_HTIMEDELTA, 0);
   if (xlen == 32) {
